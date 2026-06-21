@@ -21,6 +21,7 @@ const registrars = [
   require("./permissions"),
   require("./returns"),
   require("./inventory"),
+  require("./chat"),
 ];
 
 module.exports = (api) => {
