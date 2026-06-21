@@ -170,7 +170,7 @@ async function onStartup() {
   }
 
   try {
-    const memPath = path.join(process.cwd(), "memory");
+    const memPath = "/app/memory";
     fs.mkdirSync(memPath, { recursive: true });
     const creds = `# Test Credentials
 

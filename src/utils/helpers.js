@@ -107,6 +107,20 @@ function docOut(doc) {
   return out;
 }
 
+function invoiceStatus(doc) {
+  if (!doc) return "paid";
+  const raw = doc.status;
+  if (raw === "void" || raw === "unpaid" || raw === "paid") return raw;
+  if (doc.payment_status === "unpaid") return "unpaid";
+  return "paid";
+}
+
+function invoiceOut(doc) {
+  const out = docOut(doc);
+  out.status = invoiceStatus(doc);
+  return out;
+}
+
 // ---- Scoping ----
 function scopeQuery(user, query) {
   const q = { ...(query || {}) };
@@ -276,6 +290,8 @@ module.exports = {
   setAuthCookies,
   oid,
   docOut,
+  invoiceStatus,
+  invoiceOut,
   scopeQuery,
   stampStore,
   encryptSecret,

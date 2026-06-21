@@ -1,6 +1,6 @@
 const { db } = require("../utils/db");
 const {
-  asyncHandler, HttpError, validate, scopeQuery, docOut, oid, isoNow, round2, logMovement,
+  asyncHandler, HttpError, validate, scopeQuery, stampStore, docOut, oid, isoNow, round2, logMovement,
 } = require("../utils/helpers");
 const { authenticate, requireAdmin } = require("../middlewares/auth");
 
@@ -61,6 +61,7 @@ module.exports = (api) => {
       created_by: req.user.id,
       created_at: isoNow(),
     };
+    stampStore(req.user, doc);
     const result = await db.collection("purchase_orders").insertOne(doc);
     doc._id = result.insertedId;
     res.json(docOut(doc));

@@ -1,6 +1,6 @@
 const { db } = require("../utils/db");
 const {
-  asyncHandler, HttpError, validate, scopeQuery, docOut, oid, isoNow, decryptSecret,
+  asyncHandler, HttpError, validate, scopeQuery, docOut, invoiceStatus, oid, isoNow, decryptSecret,
 } = require("../utils/helpers");
 const { STRIPE_AVAILABLE, StripeCheckout } = require("../utils/stripe");
 const { authenticate } = require("../middlewares/auth");
@@ -14,6 +14,7 @@ module.exports = (api) => {
     if (!STRIPE_AVAILABLE) throw new HttpError(503, "Stripe library not available");
     const inv = await db.collection("invoices").findOne({ _id: oid(req.params.iid) });
     if (!inv) throw new HttpError(404, "Invoice not found");
+    if (invoiceStatus(inv) === "void") throw new HttpError(400, "Cannot pay a voided invoice");
     const sid = inv.store_id || req.user.store_id;
     let apiKey = null;
     let usedAccount = "platform";
@@ -100,7 +101,7 @@ module.exports = (api) => {
         try {
           await db.collection("invoices").updateOne(
             { _id: oid(invId) },
-            { $set: { payment_method: "stripe", payment_status: "paid", stripe_paid_at: isoNow() } }
+            { $set: { payment_method: "stripe", payment_status: "paid", status: "paid", stripe_paid_at: isoNow() } }
           );
         } catch (e) {
           // pass
@@ -146,7 +147,7 @@ module.exports = (api) => {
           try {
             await db.collection("invoices").updateOne(
               { _id: oid(invId) },
-              { $set: { payment_method: "stripe", payment_status: "paid", stripe_paid_at: isoNow() } }
+              { $set: { payment_method: "stripe", payment_status: "paid", status: "paid", stripe_paid_at: isoNow() } }
             );
           } catch (e) {
             // pass
@@ -167,6 +168,7 @@ module.exports = (api) => {
     const iid = req.params.iid;
     const inv = await db.collection("invoices").findOne({ _id: oid(iid) });
     if (!inv) throw new HttpError(404, "Invoice not found");
+    if (invoiceStatus(inv) === "void") throw new HttpError(400, "Cannot pay a voided invoice");
     const doc = {
       invoice_id: iid,
       invoice_number: inv.invoice_number,
@@ -184,7 +186,7 @@ module.exports = (api) => {
     const result = await db.collection("manual_payments").insertOne(doc);
     await db.collection("invoices").updateOne(
       { _id: oid(iid) },
-      { $set: { payment_method: payload.method, payment_status: "paid", manually_paid_at: doc.created_at } }
+      { $set: { payment_method: payload.method, payment_status: "paid", status: "paid", manually_paid_at: doc.created_at } }
     );
     doc._id = result.insertedId;
     res.json(docOut(doc));

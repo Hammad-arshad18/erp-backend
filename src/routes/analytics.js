@@ -263,7 +263,8 @@ module.exports = (api) => {
     const raw = await db.collection("invoices").aggregate(pipeline).toArray();
 
     const out = [];
-    const users = await db.collection("users").find({}).toArray();
+    const query = req.user.role === "super_admin" ? {} : { role: { $ne: "super_admin" } };
+    const users = await db.collection("users").find(query).toArray();
     const byId = {};
     for (const u of users) byId[String(u._id)] = u;
     const seen = new Set();

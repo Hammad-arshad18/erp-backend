@@ -7,8 +7,25 @@ const { authenticate, requireAdmin } = require("../middlewares/auth");
 const VALID_ROLES = ["admin", "manager", "cashier"];
 
 module.exports = (api) => {
+  api.get("/staff/directory", authenticate, asyncHandler(async (req, res) => {
+    const query = req.user.role === "super_admin" ? {} : { role: { $ne: "super_admin" } };
+    const docs = await db.collection("users").find(query).sort({ name: 1 }).toArray();
+    const stores = await db.collection("stores").find({}).toArray();
+    const storeMap = {};
+    stores.forEach(s => storeMap[s._id.toString()] = s.name);
+    
+    // Only return non-sensitive fields
+    res.json(docs.map(doc => ({ 
+      id: doc._id.toString(), 
+      name: doc.name, 
+      role: doc.role,
+      store_name: storeMap[doc.store_id] || "Main Store"
+    })));
+  }));
+
   api.get("/staff", authenticate, requireAdmin, asyncHandler(async (req, res) => {
-    const docs = await db.collection("users").find({}).sort({ created_at: -1 }).limit(200).toArray();
+    const query = req.user.role === "super_admin" ? {} : { role: { $ne: "super_admin" } };
+    const docs = await db.collection("users").find(query).sort({ created_at: -1 }).limit(200).toArray();
     res.json(docs.map(docOut));
   }));
 

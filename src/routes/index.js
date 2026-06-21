@@ -22,6 +22,7 @@ const registrars = [
   require("./returns"),
   require("./inventory"),
   require("./chat"),
+  require("./ai"),
 ];
 
 module.exports = (api) => {

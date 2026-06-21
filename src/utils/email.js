@@ -26,7 +26,7 @@ function buildInvoiceHtml(inv, payUrl = null) {
   return `<!doctype html><html><body style='margin:0;padding:32px;background:#f9f8f6;font-family:Arial,sans-serif'>
       <table style='max-width:560px;margin:auto;background:white;border-radius:16px;padding:32px;border:1px solid #e7e5e4' cellspacing='0' cellpadding='0'>
         <tr><td>
-          <h1 style='margin:0 0 4px 0;font-size:24px;color:#14532D'>FreshMarket</h1>
+          <h1 style='margin:0 0 4px 0;font-size:24px;color:#14532D'>Vyntrio ERP</h1>
           <p style='margin:0 0 24px 0;color:#78716c;font-size:13px'>Invoice ${inv.invoice_number || ""}</p>
           <p style='margin:0 0 4px 0;color:#1c1917'><strong>${inv.customer_name || "Walk-in"}</strong></p>
           <p style='margin:0 0 20px 0;color:#78716c;font-size:13px'>${createdAt}</p>
@@ -47,7 +47,7 @@ function buildInvoiceHtml(inv, payUrl = null) {
                 <td style='padding-top:8px;border-top:2px solid #14532D;text-align:right;font-weight:700;color:#14532D'>$${f2(inv.total)}</td></tr>
             ${payButton}
           </table>
-          <p style='margin-top:32px;color:#a8a29e;font-size:11px;text-align:center'>Thank you for shopping with FreshMarket. Loyalty points earned: <strong>${inv.points_earned || 0}</strong></p>
+          <p style='margin-top:32px;color:#a8a29e;font-size:11px;text-align:center'>Thank you for doing business with Vyntrio ERP. Loyalty points earned: <strong>${inv.points_earned || 0}</strong></p>
         </td></tr>
       </table>
     </body></html>`;

@@ -32,6 +32,8 @@ const STORE_UPDATE_FIELDS = [
   { name: "plan", type: "str" },
   { name: "modules_override", type: "list" },
   { name: "stripe_api_key", type: "str" },
+  { name: "ai_provider", type: "str" },
+  { name: "ai_api_key", type: "str" },
 ];
 
 const SETTINGS_FIELDS = [
@@ -43,9 +45,11 @@ const SETTINGS_FIELDS = [
   { name: "receipt_footer", type: "str" },
   { name: "logo_url", type: "str" },
   { name: "stripe_api_key", type: "str" },
+  { name: "ai_provider", type: "str" },
+  { name: "ai_api_key", type: "str" },
 ];
 
-function maskStripe(out) {
+function maskSecrets(out) {
   if (out.stripe_api_key) {
     try {
       const plain = decryptSecret(out.stripe_api_key);
@@ -55,6 +59,17 @@ function maskStripe(out) {
     }
   }
   delete out.stripe_api_key;
+
+  if (out.ai_api_key) {
+    try {
+      const plain = decryptSecret(out.ai_api_key);
+      out.ai_api_key_masked = plain.length > 8 ? `${plain.slice(0, 4)}...${plain.slice(-4)}` : "***";
+    } catch (e) {
+      out.ai_api_key_masked = "(unreadable)";
+    }
+  }
+  delete out.ai_api_key;
+  
   return out;
 }
 
@@ -124,7 +139,7 @@ module.exports = (api) => {
     if (!sid) throw new HttpError(404, "No store assigned");
     const store = await db.collection("stores").findOne({ _id: oid(sid) });
     if (!store) throw new HttpError(404, "Store not found");
-    res.json(maskStripe(docOut(store)));
+    res.json(maskSecrets(docOut(store)));
   }));
 
   api.patch("/settings/store", authenticate, requireAdmin, asyncHandler(async (req, res) => {
@@ -143,9 +158,17 @@ module.exports = (api) => {
         update.stripe_api_key = encryptSecret(k);
       }
     }
+    if ("ai_api_key" in update) {
+      const k = update.ai_api_key;
+      if (k === "" || k === "__remove__") {
+        update.ai_api_key = null;
+      } else {
+        update.ai_api_key = encryptSecret(k);
+      }
+    }
     await db.collection("stores").updateOne({ _id: oid(sid) }, { $set: update });
     const doc = await db.collection("stores").findOne({ _id: oid(sid) });
-    res.json(maskStripe(docOut(doc)));
+    res.json(maskSecrets(docOut(doc)));
   }));
 
   api.post("/settings/store/test-stripe", authenticate, requireAdmin, asyncHandler(async (req, res) => {
@@ -167,5 +190,18 @@ module.exports = (api) => {
     } catch (e) {
       throw new HttpError(400, `Key test failed: ${String(e.message || e)}`);
     }
+  }));
+
+  api.post("/settings/store/test-ai", authenticate, requireAdmin, asyncHandler(async (req, res) => {
+    const sid = req.user.store_id;
+    const store = sid ? await db.collection("stores").findOne({ _id: oid(sid) }) : null;
+    const key = (store && store.ai_api_key) ? decryptSecret(store.ai_api_key) : null;
+    const provider = (store && store.ai_provider) || "openai";
+    
+    if (!key) throw new HttpError(400, "No AI API key configured");
+    
+    // For now we just return success since we just want to verify the key is saved.
+    // Later we can implement actual API calls to OpenAI/Gemini/Anthropic/Groq.
+    res.json({ ok: true, message: `Successfully connected to ${provider} (mock test)` });
   }));
 };

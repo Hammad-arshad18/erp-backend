@@ -1,6 +1,6 @@
 const { db } = require("../utils/db");
 const {
-  asyncHandler, HttpError, validate, scopeQuery, docOut, oid, isoNow, round2,
+  asyncHandler, HttpError, validate, scopeQuery, invoiceStatus, invoiceOut, oid, isoNow, round2, logMovement,
 } = require("../utils/helpers");
 const { authenticate, requireAdmin } = require("../middlewares/auth");
 
@@ -86,6 +86,7 @@ module.exports = (api) => {
       notes: head.notes,
       points_earned: pointsEarned,
       status: "paid",
+      payment_status: "paid",
       cashier_id: req.user.id,
       cashier_name: req.user.name,
       created_at: isoNow(),
@@ -93,7 +94,6 @@ module.exports = (api) => {
     const result = await db.collection("invoices").insertOne(doc);
 
     // Decrement stock + log movement
-    const { logMovement } = require("../utils/helpers");
     for (const it of items) {
       await db.collection("products").updateOne({ _id: oid(it.product_id) }, { $inc: { stock: -it.qty } });
       await logMovement(req.user, it.product_id, it.name, -it.qty, "sale", invoiceNumber);
@@ -104,12 +104,12 @@ module.exports = (api) => {
     }
 
     doc._id = result.insertedId;
-    res.json(docOut(doc));
+    res.json(invoiceOut(doc));
   }));
 
   api.get("/invoices", authenticate, asyncHandler(async (req, res) => {
     const query = scopeQuery(req.user);
-    const { q, start, end, customer_id } = req.query;
+    const { q, start, end, customer_id, status } = req.query;
     const limit = req.query.limit !== undefined ? parseInt(req.query.limit, 10) : 200;
     if (q) {
       query.$or = [
@@ -124,23 +124,28 @@ module.exports = (api) => {
       if (end) d.$lte = end;
       query.created_at = d;
     }
-    const docs = await db.collection("invoices").find(query).sort({ created_at: -1 }).limit(limit).toArray();
-    res.json(docs.map(docOut));
+    let docs = await db.collection("invoices").find(query).sort({ created_at: -1 }).limit(limit).toArray();
+    if (status && status !== "all") {
+      docs = docs.filter((d) => invoiceStatus(d) === status);
+    }
+    res.json(docs.map(invoiceOut));
   }));
 
   api.get("/invoices/:iid", authenticate, asyncHandler(async (req, res) => {
     const doc = await db.collection("invoices").findOne({ _id: oid(req.params.iid) });
     if (!doc) throw new HttpError(404, "Invoice not found");
-    res.json(docOut(doc));
+    res.json(invoiceOut(doc));
   }));
 
   api.delete("/invoices/:iid", authenticate, requireAdmin, asyncHandler(async (req, res) => {
     const doc = await db.collection("invoices").findOne({ _id: oid(req.params.iid) });
     if (!doc) throw new HttpError(404, "Invoice not found");
+    if (invoiceStatus(doc) === "void") throw new HttpError(400, "Invoice already voided");
     // Restock items
     for (const it of doc.items || []) {
       try {
         await db.collection("products").updateOne({ _id: oid(it.product_id) }, { $inc: { stock: it.qty } });
+        await logMovement(req.user, it.product_id, it.name || "", it.qty, "adjustment", doc.invoice_number || "", "Invoice voided");
       } catch (e) {
         // pass
       }
@@ -153,7 +158,18 @@ module.exports = (api) => {
         // pass
       }
     }
-    await db.collection("invoices").deleteOne({ _id: oid(req.params.iid) });
+    await db.collection("invoices").updateOne(
+      { _id: oid(req.params.iid) },
+      {
+        $set: {
+          status: "void",
+          payment_status: "void",
+          voided_at: isoNow(),
+          voided_by: req.user.id,
+          voided_by_name: req.user.name,
+        },
+      }
+    );
     res.json({ ok: true });
   }));
 };

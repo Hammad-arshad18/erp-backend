@@ -63,7 +63,7 @@ module.exports = (api) => {
     const params = {
       from: sender,
       to: [payload.to_email],
-      subject: `Your FreshMarket receipt ${inv.invoice_number || ""}`,
+      subject: `Your Vyntrio ERP receipt ${inv.invoice_number || ""}`,
       html,
     };
     try {
